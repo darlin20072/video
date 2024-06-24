@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editor de Video Básico</title>
+    <title>Editor de Video Básico xd</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -57,14 +57,24 @@
             background: #333;
             height: 100px;
             overflow-x: auto;
+            position: relative;
         }
 
-        .timeline div {
+        .timeline-item {
             background: #007bff;
             color: white;
             padding: 5px;
             margin: 5px;
             cursor: move;
+            position: absolute;
+        }
+
+        .timeline-progress {
+            height: 4px;
+            background: #ff0000;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
 
         .text-overlay, .image-overlay {
@@ -73,13 +83,38 @@
             left: 0;
             pointer-events: none;
         }
+
+        .timeline {
+            display: flex;
+            align-items: center;
+            background: #333;
+            height: 100px;
+            overflow-x: auto;
+        }
+
+        .timeline-item {
+            background: #007bff;
+            color: white;
+            padding: 5px;
+            margin: 5px;
+            cursor: move;
+            position: relative;
+        }
+
+        .timeline-progress {
+            height: 4px;
+            background: #ff0000;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Editor de Video Básico</h1>
         <div class="theme-switcher">
-            <button id="toggleThemeButton">Canbiar tema</button>
+            <button id="toggleThemeButton">Toggle Theme</button>
         </div>
         <input type="file" id="videoUploader" accept="video/*">
         <video id="videoPlayer" controls></video>
@@ -93,6 +128,7 @@
             <button id="exportButton">Export</button>
         </div>
         <div class="timeline" id="timeline">
+            <div class="timeline-progress" id="timelineProgress"></div>
             <!-- Timeline items will be appended here -->
         </div>
     </div>
@@ -109,17 +145,22 @@
             const addImageButton = document.getElementById('addImageButton');
             const exportButton = document.getElementById('exportButton');
             const timeline = document.getElementById('timeline');
+            const timelineProgress = document.getElementById('timelineProgress');
             const toggleThemeButton = document.getElementById('toggleThemeButton');
             const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
             let isDarkTheme = true;
+            let videoDuration = 0;
 
             videoUploader.addEventListener('change', function() {
                 const file = this.files[0];
                 if (file) {
                     const fileURL = URL.createObjectURL(file);
                     videoPlayer.src = fileURL;
-                    addToTimeline(file.name, 'video');
+                    addToTimeline(file.name, 'video', 0);
+                    videoPlayer.onloadedmetadata = function() {
+                        videoDuration = videoPlayer.duration;
+                    };
                 }
             });
 
@@ -142,8 +183,8 @@
             addTextButton.addEventListener('click', function() {
                 const text = prompt('Enter text to add:');
                 if (text) {
-                    addToTimeline(text, 'text');
-                    overlayText(text);
+                    addToTimeline(text, 'text', videoPlayer.currentTime);
+                    overlayText(text, videoPlayer.currentTime);
                 }
             });
 
@@ -155,8 +196,8 @@
                     const file = this.files[0];
                     if (file) {
                         const fileURL = URL.createObjectURL(file);
-                        addToTimeline(file.name, 'image');
-                        overlayImage(fileURL);
+                        addToTimeline(file.name, 'image', videoPlayer.currentTime);
+                        overlayImage(fileURL, videoPlayer.currentTime);
                     }
                 };
                 fileInput.click();
@@ -175,9 +216,17 @@
                 document.querySelector('.timeline').style.backgroundColor = isDarkTheme ? '#333' : '#ddd';
             });
 
-            function addToTimeline(content, type) {
+            videoPlayer.ontimeupdate = function() {
+                const progress = (videoPlayer.currentTime / videoDuration) * 100;
+                timelineProgress.style.width = progress + '%';
+                moveOverlays(videoPlayer.currentTime);
+            };
+
+            function addToTimeline(content, type, startTime) {
                 const item = document.createElement('div');
+                item.className = 'timeline-item';
                 item.innerText = `${type.toUpperCase()}: ${content}`;
+                item.style.left = (startTime / videoDuration) * 100 + '%';
                 item.draggable = true;
                 item.ondragstart = function(event) {
                     event.dataTransfer.setData('text/plain', event.target.id);
@@ -185,60 +234,68 @@
                 timeline.appendChild(item);
             }
 
-            function overlayText(text) {
+            function overlayText(text, time) {
                 const textOverlay = document.createElement('div');
                 textOverlay.className = 'text-overlay';
                 textOverlay.innerText = text;
+                textOverlay.dataset.startTime = time;
                 document.body.appendChild(textOverlay);
             }
 
-            function overlayImage(src) {
+            function overlayImage(src, time) {
                 const img = document.createElement('img');
                 img.src = src;
                 img.className = 'image-overlay';
+                img.dataset.startTime = time;
                 document.body.appendChild(img);
             }
 
-            function exportVideo() {
-                alert('Exporting video... (Functionality not fully implemented)');
-                // Capture video frame and overlay text/images
-                canvas.width = videoPlayer.videoWidth;
-                canvas.height = videoPlayer.videoHeight;
-                ctx.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
-
-                document.querySelectorAll('.text-overlay').forEach(textOverlay => {
-                    ctx.font = '30px Arial';
-                    ctx.fillStyle = 'white';
-                    ctx.fillText(textOverlay.innerText, 50, 50); // Example position
+            function moveOverlays(currentTime) {
+                document.querySelectorAll('.text-overlay, .image-overlay').forEach(overlay => {
+                    const startTime = parseFloat(overlay.dataset.startTime);
+                    if (currentTime >= startTime && currentTime < startTime + 5) {
+                        overlay.style.display = 'block';
+                    } else {
+                        overlay.style.display = 'none';
+                    }
                 });
-
-                document.querySelectorAll('.image-overlay').forEach(imageOverlay => {
-                    const img = new Image();
-                    img.src = imageOverlay.src;
-                    img.onload = function() {
-                        ctx.drawImage(img, 100, 100); // Example position
-                    };
-                });
-
-                // Export canvas to image or video format
-                const dataURL = canvas.toDataURL('image/png');
-                const link = document.createElement('a');
-                link.href = dataURL;
-                link.download = 'video_frame.png';
-                link.click();
             }
 
-            timeline.ondragover = function(event) {
-                event.preventDefault();
-            };
+            function exportVideo() {
+                canvas.width = videoPlayer.videoWidth;
+                canvas.height = videoPlayer.videoHeight;
+                const fps = 30;
+                const duration = videoPlayer.duration;
+                let currentTime = 0;
 
-            timeline.ondrop = function(event) {
-                const id = event.dataTransfer.getData('text/plain');
-                const draggableElement = document.getElementById(id);
-                const dropzone = event.target;
-                dropzone.appendChild(draggableElement);
-                event.dataTransfer.clearData();
-            };
+                function captureFrame() {
+                    videoPlayer.currentTime = currentTime;
+                    ctx.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
+                    document.querySelectorAll('.text-overlay, .image-overlay').forEach(overlay => {
+                        const startTime = parseFloat(overlay.dataset.startTime);
+                        if (currentTime >= startTime && currentTime < startTime + 5) {
+                            if (overlay.tagName === 'DIV') {
+                                ctx.font = '30px Arial';
+                                ctx.fillStyle = 'white';
+                                ctx.fillText(overlay.innerText, 50, 50);
+                            } else if (overlay.tagName === 'IMG') {
+                                ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
+                            }
+                        }
+                    });
+                    currentTime += 1 / fps;
+                    if (currentTime <= duration) {
+                        requestAnimationFrame(captureFrame);
+                    } else {
+                        const videoURL = canvas.toDataURL('video/mp4');
+                        const a = document.createElement('a');
+                        a.href = videoURL;
+                        a.download = 'exported_video.mp4';
+                        a.click();
+                    }
+                }
+                captureFrame();
+            }
         });
     </script>
 </body>
