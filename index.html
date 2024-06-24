@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Videollamadasxd</title>
+    <title>Videollamadas</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -33,6 +33,25 @@
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
+
+        textarea {
+            width: 100%;
+            height: 80px;
+            margin: 10px 0;
+            border-radius: 4px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -45,6 +64,14 @@
         <div id="join">
             <input type="text" id="roomId" placeholder="Ingrese el código de la sala" />
             <button onclick="joinRoom()">Unirse a la sala</button>
+        </div>
+        <div>
+            <textarea id="offer" placeholder="Oferta (copiar aquí)"></textarea>
+            <button onclick="setOffer()">Establecer oferta</button>
+        </div>
+        <div>
+            <textarea id="answer" placeholder="Respuesta (copiar aquí)"></textarea>
+            <button onclick="setAnswer()">Establecer respuesta</button>
         </div>
         <div id="videoContainer" hidden>
             <video id="localVideo" autoplay muted></video>
@@ -65,8 +92,6 @@
             audio: true
         };
 
-        const rooms = {}; // Object to store rooms and their peer connections
-
         function generateRoomId() {
             return Math.random().toString(36).substring(2, 7);
         }
@@ -75,16 +100,11 @@
             const roomId = generateRoomId();
             document.getElementById('newRoomId').innerText = `Código de sala: ${roomId}`;
             await startConnection(roomId);
-            rooms[roomId] = peerConnection; // Store the peer connection in the rooms object
         }
 
         async function joinRoom() {
             const roomId = document.getElementById('roomId').value;
-            if (rooms[roomId]) {
-                await startConnection(roomId);
-            } else {
-                alert("Sala no encontrada");
-            }
+            await startConnection(roomId);
         }
 
         async function startConnection(roomId) {
@@ -110,21 +130,25 @@
                     remoteVideo.srcObject = event.streams[0];
                 }
             };
+        }
 
-            peerConnection.onnegotiationneeded = async () => {
-                if (!rooms[roomId]) {
-                    const offer = await peerConnection.createOffer();
-                    await peerConnection.setLocalDescription(offer);
-                    console.log(JSON.stringify(offer));
-                    rooms[roomId] = peerConnection;
-                }
-            };
+        async function createOffer() {
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            document.getElementById('offer').value = JSON.stringify(offer);
+        }
 
-            if (rooms[roomId]) {
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                console.log(JSON.stringify(answer));
-            }
+        async function setOffer() {
+            const offer = JSON.parse(document.getElementById('offer').value);
+            await peerConnection.setRemoteDescription(offer);
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            document.getElementById('answer').value = JSON.stringify(answer);
+        }
+
+        async function setAnswer() {
+            const answer = JSON.parse(document.getElementById('answer').value);
+            await peerConnection.setRemoteDescription(answer);
         }
     </script>
 </body>
