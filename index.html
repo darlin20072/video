@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Videollamadas</title>
+    <title>Videollamadasxd</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -38,13 +38,13 @@
 <body>
     <div id="container">
         <h1>Videollamadas</h1>
-        <div id="join">
-            <input type="text" id="roomId" placeholder="Ingrese el código de la sala" />
-            <button onclick="joinRoom()">Unirse a la sala</button>
-        </div>
         <div id="create">
             <button onclick="createRoom()">Crear sala</button>
             <p id="newRoomId"></p>
+        </div>
+        <div id="join">
+            <input type="text" id="roomId" placeholder="Ingrese el código de la sala" />
+            <button onclick="joinRoom()">Unirse a la sala</button>
         </div>
         <div id="videoContainer" hidden>
             <video id="localVideo" autoplay muted></video>
@@ -65,22 +65,31 @@
             audio: true
         };
 
-        const peers = {}; // Object to store peer connections
+        const rooms = {}; // Object to store rooms and their peer connections
+
+        function generateRoomId() {
+            return Math.random().toString(36).substring(2, 7);
+        }
 
         async function createRoom() {
-            const roomId = Math.random().toString(36).substring(2, 7);
+            const roomId = generateRoomId();
             document.getElementById('newRoomId').innerText = `Código de sala: ${roomId}`;
             await startConnection(roomId);
+            rooms[roomId] = peerConnection; // Store the peer connection in the rooms object
         }
 
         async function joinRoom() {
             const roomId = document.getElementById('roomId').value;
-            await startConnection(roomId);
+            if (rooms[roomId]) {
+                await startConnection(roomId);
+            } else {
+                alert("Sala no encontrada");
+            }
         }
 
         async function startConnection(roomId) {
-            document.getElementById('join').hidden = true;
             document.getElementById('create').hidden = true;
+            document.getElementById('join').hidden = true;
             document.getElementById('videoContainer').hidden = false;
 
             localStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -103,15 +112,15 @@
             };
 
             peerConnection.onnegotiationneeded = async () => {
-                if (!peers[roomId]) {
+                if (!rooms[roomId]) {
                     const offer = await peerConnection.createOffer();
                     await peerConnection.setLocalDescription(offer);
                     console.log(JSON.stringify(offer));
-                    peers[roomId] = peerConnection;
+                    rooms[roomId] = peerConnection;
                 }
             };
 
-            if (peers[roomId]) {
+            if (rooms[roomId]) {
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
                 console.log(JSON.stringify(answer));
