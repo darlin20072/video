@@ -38,25 +38,21 @@
 <body>
     <div id="container">
         <h1>Videollamadas</h1>
+        <div id="join">
+            <input type="text" id="roomId" placeholder="Ingrese el código de la sala" />
+            <button onclick="joinRoom()">Unirse a la sala</button>
+        </div>
         <div id="create">
-            <button onclick="createOffer()">Crear sala</button>
+            <button onclick="createRoom()">Crear sala</button>
+            <p id="newRoomId"></p>
         </div>
-        <div>
-            <textarea id="offer" placeholder="Offer"></textarea>
-            <button onclick="setOffer()">Set Offer</button>
-        </div>
-        <div>
-            <textarea id="answer" placeholder="Answer"></textarea>
-            <button onclick="setAnswer()">Set Answer</button>
-        </div>
-        <div id="videoContainer">
+        <div id="videoContainer" hidden>
             <video id="localVideo" autoplay muted></video>
             <video id="remoteVideo" autoplay></video>
         </div>
     </div>
     <script>
         let localStream;
-        let remoteStream;
         let peerConnection;
         const servers = {
             iceServers: [
@@ -69,10 +65,28 @@
             audio: true
         };
 
-        async function createOffer() {
-            peerConnection = new RTCPeerConnection(servers);
+        const peers = {}; // Object to store peer connections
+
+        async function createRoom() {
+            const roomId = Math.random().toString(36).substring(2, 7);
+            document.getElementById('newRoomId').innerText = `Código de sala: ${roomId}`;
+            await startConnection(roomId);
+        }
+
+        async function joinRoom() {
+            const roomId = document.getElementById('roomId').value;
+            await startConnection(roomId);
+        }
+
+        async function startConnection(roomId) {
+            document.getElementById('join').hidden = true;
+            document.getElementById('create').hidden = true;
+            document.getElementById('videoContainer').hidden = false;
+
             localStream = await navigator.mediaDevices.getUserMedia(constraints);
             document.getElementById('localVideo').srcObject = localStream;
+
+            peerConnection = new RTCPeerConnection(servers);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
             peerConnection.onicecandidate = event => {
@@ -82,43 +96,26 @@
             };
 
             peerConnection.ontrack = event => {
-                remoteStream = event.streams[0];
-                document.getElementById('remoteVideo').srcObject = remoteStream;
-            };
-
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            document.getElementById('offer').value = JSON.stringify(offer);
-        }
-
-        async function setOffer() {
-            const offer = JSON.parse(document.getElementById('offer').value);
-            peerConnection = new RTCPeerConnection(servers);
-
-            peerConnection.onicecandidate = event => {
-                if (event.candidate) {
-                    console.log(JSON.stringify(event.candidate));
+                const remoteVideo = document.getElementById('remoteVideo');
+                if (!remoteVideo.srcObject) {
+                    remoteVideo.srcObject = event.streams[0];
                 }
             };
 
-            peerConnection.ontrack = event => {
-                remoteStream = event.streams[0];
-                document.getElementById('remoteVideo').srcObject = remoteStream;
+            peerConnection.onnegotiationneeded = async () => {
+                if (!peers[roomId]) {
+                    const offer = await peerConnection.createOffer();
+                    await peerConnection.setLocalDescription(offer);
+                    console.log(JSON.stringify(offer));
+                    peers[roomId] = peerConnection;
+                }
             };
 
-            localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            document.getElementById('localVideo').srcObject = localStream;
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            document.getElementById('answer').value = JSON.stringify(answer);
-        }
-
-        async function setAnswer() {
-            const answer = JSON.parse(document.getElementById('answer').value);
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            if (peers[roomId]) {
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                console.log(JSON.stringify(answer));
+            }
         }
     </script>
 </body>
